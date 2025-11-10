@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+.bg-background{
+    background-color:  #06080d;
+}
+.logo-text{
+    font-family: var(--font-suez-one);
+}
+.text-font{
+    font-family: var(--font-space-mono);
+}
+.head-font{
+    font-family: var(--font-montserrat);
+}
+
+.custom-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scroll::-webkit-scrollbar-track {
+  background: #0d0f14;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+  background-color: #555;
+  border-radius: 10px;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: #888;
+}
+
+.custom-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #555 #0d0f14;
+}
+
+
+.font1 {
+  font-family: var(--font-lobster);
+  background: linear-gradient(90deg, #fff, #fff 30%,#4dea9e 95%);
+    /* background: linear-gradient(90deg, #00ffc0 -10%, #fff 15%, #fff 68%, #7e63dd 95%); */
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+
+}
+
+.font2 {
+  font-family: var(--font-onest);
+}
+
+.font3 {
+  font-family: var(--font-dancing);
+}
+.font5{
+    font-family: var(--libre-font);
+}
+
+.font4{
+  font-family: var(--libre-font);
+  background: linear-gradient(90deg, #00ffc0 -10%, #fff 15%, #fff 68%, #7e63dd 95%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+}
+
+
+.heading{
+  font-family: var(--heading-font);
+}

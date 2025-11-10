@@ -1,0 +1,254 @@
+# # image is not showing of cid:: on
+
+# <div style={{margin: "12px 0"}}>
+#   <p><b>Select Handwriting Mode</b></p>
+
+#   <label>
+#     <input
+#       type="radio"
+#       name="mode"
+#       value="vision"
+#       checked={mode === "vision"}
+#       onChange={() => setMode("vision")}
+#     /> 
+#     ✨ Smart Recognition (Google Vision)
+#   </label>
+#   <p style={{fontSize: 12, marginLeft: 24}}>
+#     ✅ Best accuracy • ⚡ Fast • Internet required
+#   </p>
+
+#   <label>
+#     <input
+#       type="radio"
+#       name="mode"
+#       value="trocr"
+#       checked={mode === "trocr"}
+#       onChange={() => setMode("trocr")}
+#     /> 
+#     📦 Basic Offline Recognition (TrOCR)
+#   </label>
+#   <p style={{fontSize: 12, marginLeft: 24}}>
+#     Works anywhere • Good for limited network • Lower accuracy than Smart Mode
+#   </p>
+
+#   <label>
+#     <input
+#       type="radio"
+#       name="mode"
+#       value="personal"
+#       checked={mode === "personal"}
+#       onChange={() => setMode("personal")}
+#     /> 
+#     ✍️ My Handwriting Mode (Personalized)
+#   </label>
+#   <p style={{fontSize: 12, marginLeft: 24}}>
+#     Learns from your handwriting • Best after training • Improves with use
+#   </p>
+
+#   <p style={{fontSize: 12, color: "#444", marginTop: 6}}>
+#     Tip: Start with Smart Mode. Switch to My Handwriting Mode after you’ve trained your handwriting samples!
+#   </p>
+# </div>
+
+
+
+
+# --------------------------------------------------------------\
+# import os, boto3, shutil
+# from dotenv import load_dotenv
+
+# load_dotenv()
+# S3_BUCKET = os.getenv("S3_BUCKET")
+# REGION = os.getenv("AWS_REGION")
+
+# s3 = boto3.client("s3", region_name=REGION)
+
+# def upload_model(local_dir: str, user_id: str, version: int):
+#     prefix = f"models/{user_id}/v{version}/"
+#     for root, _, files in os.walk(local_dir):
+#         for f in files:
+#             path = os.path.join(root, f)
+#             key = prefix + f
+#             s3.upload_file(path, S3_BUCKET, key)
+#     return prefix
+
+
+# def download_model(user_id: str, version: int, cache_dir: str) -> str:
+#     """Download if not cached."""
+#     prefix = f"models/{user_id}/v{version}/"
+#     local_dir = os.path.join(cache_dir, prefix.replace("/", "_"))
+    
+#     if os.path.exists(local_dir) and os.listdir(local_dir):
+#         return local_dir  # already cached ✅
+
+#     os.makedirs(local_dir, exist_ok=True)
+#     paginator = s3.get_paginator("list_objects_v2")
+
+#     for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=prefix):
+#         for obj in page.get("Contents", []):
+#             key = obj["Key"]
+#             rel = key[len(prefix):]
+#             dest = os.path.join(local_dir, rel)
+#             os.makedirs(os.path.dirname(dest), exist_ok=True)
+#             s3.download_file(S3_BUCKET, key, dest)
+
+#     return local_dir
+
+
+
+
+#--------------------------------------
+# from flask import Flask, request, jsonify
+# import requests, os, io, torch
+# from PIL import Image
+# from torch.utils.data import Dataset
+# from transformers import *
+# from dotenv import load_dotenv
+# from s3_helper import upload_model
+
+# load_dotenv()
+# app = Flask(__name__)
+
+# BASE_MODEL = os.getenv("BASE_MODEL")
+# MODEL_CACHE = os.getenv("MODEL_CACHE", "./cached_models")
+
+# processor = TrOCRProcessor.from_pretrained(BASE_MODEL)
+# model = VisionEncoderDecoderModel.from_pretrained(BASE_MODEL)
+
+# class TrainDataset(Dataset):
+#     def __init__(self, samples):
+#         self.samples = samples
+
+#     def __len__(self): return len(self.samples)
+
+#     def __getitem__(self, idx):
+#         item = self.samples[idx]
+#         img_bytes = requests.get(item["image_url"]).content
+#         pil = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+#         enc = processor(images=pil, text=item["text"], truncation=True,
+#                         padding="max_length", max_length=256, return_tensors="pt")
+#         return {k: v.squeeze(0) for k, v in enc.items()}
+
+
+# @app.route("/train", methods=["POST"])
+# def train():
+#     data = request.get_json()
+#     user_id = data.get("user_id")
+#     samples = data.get("samples", [])
+
+#     if len(samples) < 10:
+#         return jsonify({"ok": False, "error": "≥10 samples needed"}), 400
+
+#     dataset = TrainDataset(samples)
+
+#     version = 1 if not os.path.exists(f"{MODEL_CACHE}/{user_id}_v1") else 2
+#     out_dir = f"{MODEL_CACHE}/{user_id}_v{version}"
+#     os.makedirs(out_dir, exist_ok=True)
+
+#     args = Seq2SeqTrainingArguments(
+#         output_dir=out_dir,
+#         learning_rate=5e-5,
+#         per_device_train_batch_size=2,
+#         num_train_epochs=1,
+#         logging_steps=10,
+#         save_total_limit=1
+#     )
+
+#     trainer = Seq2SeqTrainer(model=model, args=args, train_dataset=dataset)
+#     trainer.train()
+
+#     model.save_pretrained(out_dir)
+#     processor.save_pretrained(out_dir)
+
+#     s3_prefix = upload_model(out_dir, user_id, version)
+
+#     return jsonify({"ok": True, "model_path": s3_prefix, "version": version})
+
+
+# if __name__ == "__main__":
+#     app.run(host="0.0.0.0", port=6000)
+
+
+
+# from flask import Flask, request, jsonify
+# from PIL import Image
+# import io, torch
+# from load_model import load_user_model
+# from dotenv import load_dotenv
+
+# load_dotenv()
+# app = Flask(__name__)
+
+# @app.route("/ocr/personal", methods=["POST"])
+# def personal_ocr():
+#     user_id = request.form.get("user_id")
+#     model_version = int(request.form.get("model_version"))
+#     img = request.files.get("file")
+
+#     if not img: return jsonify({"ok": False, "error": "file missing"}), 400
+
+#     processor, model = load_user_model(user_id, model_version)
+
+#     image = Image.open(io.BytesIO(img.read())).convert("RGB")
+#     pix = processor(images=image, return_tensors="pt").pixel_values
+
+#     with torch.inference_mode():
+#         ids = model.generate(pix, max_length=512)
+
+#     text = processor.decode(ids[0], skip_special_tokens=True)
+#     return jsonify({"ok": True, "text": text.strip()})
+
+# if __name__ == "__main__":
+#     app.run(port=6001)
+
+
+
+# <div style={{margin: "12px 0"}}>
+#   <p><b>Select Handwriting Mode</b></p>
+
+#   <label>
+#     <input
+#       type="radio"
+#       name="mode"
+#       value="vision"
+#       checked={mode === "vision"}
+#       onChange={() => setMode("vision")}
+#     /> 
+#     ✨ Smart Recognition (Google Vision)
+#   </label>
+#   <p style={{fontSize: 12, marginLeft: 24}}>
+#     ✅ Best accuracy • ⚡ Fast • Internet required
+#   </p>
+
+#   <label>
+#     <input
+#       type="radio"
+#       name="mode"
+#       value="trocr"
+#       checked={mode === "trocr"}
+#       onChange={() => setMode("trocr")}
+#     /> 
+#     📦 Basic Offline Recognition (TrOCR)
+#   </label>
+#   <p style={{fontSize: 12, marginLeft: 24}}>
+#     Works anywhere • Good for limited network • Lower accuracy than Smart Mode
+#   </p>
+
+#   <label>
+#     <input
+#       type="radio"
+#       name="mode"
+#       value="personal"
+#       checked={mode === "personal"}
+#       onChange={() => setMode("personal")}
+#     /> 
+#     ✍️ My Handwriting Mode (Personalized)
+#   </label>
+#   <p style={{fontSize: 12, marginLeft: 24}}>
+#     Learns from your handwriting • Best after training • Improves with use
+#   </p>
+
+#   <p style={{fontSize: 12, color: "#444", marginTop: 6}}>
+#     Tip: Start with Smart Mode. Switch to My Handwriting Mode after you’ve trained your handwriting samples!
+#   </p>
+# </div>
