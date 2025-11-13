@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     }
 
     if(res?.data == null){
-        return  ;
+        return NextResponse.json({ message: "Backend did not return expected data" },{status:400});
     }
     const { job_id } = res.data;
     console.log("Job started:", job_id);
