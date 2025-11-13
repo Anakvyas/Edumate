@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 
     console.log(access_token, refresh_token, expires_in);
 
-    const res = NextResponse.redirect("http://localhost:3000/home");
+    const res = NextResponse.redirect("https://edumate-w2l7.vercel.app");
 
     res.cookies.set("ms_tokens", 
       JSON.stringify({
