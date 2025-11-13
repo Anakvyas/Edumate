@@ -4,6 +4,7 @@ import { duration } from 'html2canvas/dist/types/css/property-descriptors/durati
 import React, { useState } from 'react';
 import Vision from './Vision';
 import Finetune from './Finetune';
+import Back from '../components/Back'
 
 // type TechniqueKey = "vision" | "trocr" | "finetune";
 
@@ -47,6 +48,8 @@ const Page = () => {
     }
 
     return (
+        <div className='relative'>
+              <Back/> 
         <div className='w-full min-h-screen flex flex-col justify-center items-center text-font'>
             <motion.div className='' initial={{ opacity: 0.1, y: -100 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: "linear" }}>
                 <span className=' w-full h-[86vh]  text-gray-200 italic text-md lg:text-xl'>Select your Technique - </span>
@@ -67,6 +70,7 @@ const Page = () => {
                     ))}
                 </div>
             </motion.div>
+        </div>
         </div>
     );
 }

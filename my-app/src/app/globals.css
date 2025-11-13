@@ -51,6 +51,9 @@
   font-family: var(--font-onest);
 }
 
+.font6{
+    font-family: var(--font-lobster);
+}
 .font3 {
   font-family: var(--font-dancing);
 }
@@ -71,3 +74,4 @@
 .heading{
   font-family: var(--heading-font);
 }
+

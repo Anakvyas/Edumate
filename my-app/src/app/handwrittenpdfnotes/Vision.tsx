@@ -49,8 +49,8 @@ const Vision = () => {
 
                 }
             })
-            console.log(res.data.url)
-            setpdfurl(res.data.url)
+            console.log(res.data.pdflink)
+            setpdfurl(res.data.pdflink)
 
         } catch (err: any) {
             console.log(err);

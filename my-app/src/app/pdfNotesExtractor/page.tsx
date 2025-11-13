@@ -6,7 +6,7 @@ import { FileUp, Upload } from 'lucide-react';
 import PdfViewer from '../components/pdfViewer';
 import { head } from 'framer-motion/client';
 import axios from 'axios';
-
+import Back from '../components/Back'
 const Page = () => {
     const [file, setfile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -61,12 +61,13 @@ const Page = () => {
         setpdflink(res.data.link);
     }
 
-    if (pdflink != "https://eu-north-1.console.aws.amazon.com/s3/object/edumate-bucket?region=eu-north-1&prefix=pdfs/02265c02-1d3a-4d37-9267-6941584fd27b.pdf") {
-        return <PdfViewer pdfurl={"https://eu-north-1.console.aws.amazon.com/s3/object/edumate-bucket?region=eu-north-1&prefix=pdfs/02265c02-1d3a-4d37-9267-6941584fd27b.pdf"} />
+    if (pdflink != "") {
+        return <PdfViewer pdfurl={pdflink} />
     }
 
 
     return (
+        <div className='relative'> <Back/>
         <div className='flex flex-col jsutify-center items-center p-5  text-font'>
             <input className='hidden' ref={fileInputRef} type='file' accept='application/pdf' onChange={handlefilechange} />
             <motion.div className='bg-[linear-gradient(120deg,#7dd87d,#5e63b6)] p-[0.9px] rounded-xl'
@@ -101,6 +102,7 @@ const Page = () => {
                 </div>
             </motion.div>
         </div>
+    </div>
     )
 
 

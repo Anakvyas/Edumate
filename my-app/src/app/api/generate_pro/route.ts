@@ -87,7 +87,7 @@ RETURN THIS JSON STRUCTURE:
     ) {
       return NextResponse.json({ error: "Invalid response. Try again." });
     }
-    saveProject(json.project_name, { ...json.frontend, ...json.backend });
+    // saveProject(json.project_name, { ...json.frontend, ...json.backend });
 
     return NextResponse.json(json);
 
@@ -98,17 +98,17 @@ RETURN THIS JSON STRUCTURE:
 }
 
 
-import fs from "fs";
-import path from "path";
+// import fs from "fs";
+// import path from "path";
 
-export async function saveProject(projectName: any, files: any) {
-  const safeName = projectName.replace(/\s+/g, "-").toLowerCase();
-  const dir = path.join(process.cwd(), "public/generated_projects", safeName);
-  fs.mkdirSync(dir, { recursive: true });
+// export async function saveProject(projectName: any, files: any) {
+//   const safeName = projectName.replace(/\s+/g, "-").toLowerCase();
+//   const dir = path.join(process.cwd(), "public/generated_projects", safeName);
+//   fs.mkdirSync(dir, { recursive: true });
 
-  for (const file in files) {
-    fs.writeFileSync(path.join(dir, file), files[file]);
-  }
+//   for (const file in files) {
+//     fs.writeFileSync(path.join(dir, file), files[file]);
+//   }
 
-  return safeName;
-}
+//   return safeName;
+// }

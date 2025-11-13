@@ -12,6 +12,7 @@ import QuizGenerator from './pdf_comp/QuizGenerator';
 import ShortNotes from './pdf_comp/ShortNotes';
 import ChatWithPdf from './pdf_comp/ChatWithPdf';
 import ConeptMap from './pdf_comp/ConeptMap';
+import Back from './Back';
 
 const pdffeature = [  
   { name: "Chat with PDF", icon: MessageCircle,comp:ChatWithPdf },
@@ -28,7 +29,8 @@ const PdfViewer = ({ pdfurl }: { pdfurl: string }) => {
   const [left, setleft] = useState<Number | null>(null);
   const [selectedText, setSelectedText] = useState("");
   const [selectedfeature, setSelectedfeature] = useState<number | null>(null);
-  const [persit_dir, setpersit_dir] = useState("./vectorstores/1e80f322-cf8d-46f0-8594-9497d47f6938");
+  const [persit_dir, setpersit_dir] = useState("");
+
 
   const handleSelect = (event: React.MouseEvent) => {
     const text = window.getSelection()?.toString().trim() || "";
@@ -53,18 +55,18 @@ const PdfViewer = ({ pdfurl }: { pdfurl: string }) => {
   };
 
 
-  // useEffect(() => {
+  useEffect(() => {
 
-  //   const getpersit = async () => {
-  //     const res = await axios.get("/api/video", {
-  //       params: { pdfurl: pdfurl }
-  //     })
+    const getpersit = async () => {
+      const res = await axios.get("/api/video", {
+        params: { pdfurl: pdfurl }
+      })
+      console.log(res.data.persist)
+      setpersit_dir(res.data.persist)
+    }
 
-  //     setpersit_dir(res.data.persist)
-  //   }
-
-  //   getpersit()
-  // }, [pdfurl])
+    getpersit()
+  }, [pdfurl])
 
 
 
@@ -75,6 +77,8 @@ const PdfViewer = ({ pdfurl }: { pdfurl: string }) => {
 
   // console.log(pdfurl)
   return (
+    <div className='relative'>
+      <Back/> 
     <div className='flex flex-row gap-15 mx-14 overflow-hidden'>
       <div className='bg-[linear-gradient(120deg,#7dd87d,#5e63b6)] p-[3px] w-[40vw] h-[85vh] m-3 rounded-xl text-font shadow-2xl'>
         <div className='w-full h-full bg-gray-900 p-2 rounded-xl flex flex-col gap-1 text-gray-300'>
@@ -174,7 +178,7 @@ const PdfViewer = ({ pdfurl }: { pdfurl: string }) => {
                         {pdffeature[selectedfeature].name}
                       </h2>
                     </div>
-                    <Comp persist_dir={persit_dir}/>
+                    <Comp persist_dir={persit_dir} />
 
                   </div>
                 );
@@ -186,7 +190,7 @@ const PdfViewer = ({ pdfurl }: { pdfurl: string }) => {
 
 
 
-
+      </div>
     </div>
   );
 }

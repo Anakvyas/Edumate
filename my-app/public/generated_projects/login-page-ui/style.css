@@ -1,0 +1,81 @@
+body {
+
+         font-family: Arial, sans-serif;
+
+         background-color: #f2f2f2;
+
+      }
+
+      .hero {
+
+         background-image: linear-gradient(to bottom, #333, #555);
+
+         color: white;
+
+         padding: 50px;
+
+         text-align: center;
+
+      }
+
+      nav button {
+
+         background-color: #ccc;
+
+         border: none;
+
+         padding: 10px 20px;
+
+         font-size: 16px;
+
+         cursor: pointer;
+
+      }
+
+      nav button:hover {
+
+         background-color: #aaa;
+
+      }
+
+      main form {
+
+         display: flex;
+
+         flex-direction: column;
+
+         align-items: center;
+
+         padding: 20px;
+
+      }
+
+      input {
+
+         padding: 10px;
+
+         margin-bottom: 20px;
+
+         box-sizing: border-box;
+
+      }
+
+      button[type='submit'] {
+
+         background-color: #4CAF50;
+
+         color: white;
+
+         padding: 10px 20px;
+
+         border: none;
+
+         cursor: pointer;
+
+      }
+
+      button[type='submit']:hover {
+
+         background-color: #3e8e41;
+
+      }

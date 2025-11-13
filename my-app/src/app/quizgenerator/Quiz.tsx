@@ -1,3 +1,4 @@
+"use client"
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import Result from "./Result";
@@ -56,7 +57,7 @@ const Quiz = ({ quiz }: { quiz: Quiz }) => {
         return <Result id ={quiz._id} />
     }
     return (
-        <div className="h-full ">
+        <div className="h-full w-full">
             <div className="flex flex-col gap-5 w-full h-full justify-center items-center">
                 {quiz.questions.map((ques, qIdx) => (
                     <div

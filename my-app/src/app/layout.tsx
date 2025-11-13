@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Lobster ,Dancing_Script,Onest,Headland_One, Libre_Baskerville,Suez_One,Space_Mono,Montserrat} from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/navbar";
+import Footer from "./components/footer";
 // import {Lobster ,Dancing_Script,Onest,Headland_One, Libre_Baskerville} from "next/font/google";
 
 
@@ -72,6 +73,7 @@ export default function RootLayout({
       >
         <Navbar/>
         {children}
+        <Footer/>
       </body>
     </html>
   );

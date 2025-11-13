@@ -11,9 +11,9 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
-        source: "/",        // when user visits /
-        destination: "/dashboard",  // redirect to /dashboard
-        permanent: true,    // use 308 redirect (SEO-friendly)
+        source: "/dashboard",        // when user visits /
+        destination: "/home",  
+        permanent: true,   
       },
     ];
   },

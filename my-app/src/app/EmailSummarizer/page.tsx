@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import Shymmer from '../components/Shymmer';
 import axios from 'axios';
 import { select } from 'framer-motion/client';
+import Back  from '../components/Back'
 
 interface Email {
     id: string;
@@ -127,8 +128,8 @@ const Page = () => {
 
     return (
         <div className='relative'>
-            <div className='flex flex-row p-5 text-font w-full max-h-[calc(100vh-12vh)] p-1 gap-12 mx-auto absolute inset-0 transition-all'>
-
+            <Back></Back>
+            <div className='flex flex-row p-5 text-font w-full min-h-[calc(100vh-12vh)] p-1 gap-12 mx-auto transition-all'>
                 <div className='bg-[linear-gradient(120deg,#7dd87d,#5e63b6)] p-[0.9px] rounded-xl w-[25vw] h-[84vh] max-w-[25vw] max-h-[84vh] '>
                     {loading ? <Shymmer /> : <>
                         <div className='flex flex-col gap-2 text-gray-500 w-full h-full bg-[#0c0e0f] p-3 rounded-xl'>

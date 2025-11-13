@@ -10,7 +10,7 @@ const features = [
   { name: "Project Builder", desc: "Auto-generate projects with documentation and reports.",img:"./Project Builder.png",url:'./generate_pro' },
   { name: "PPT Generator", desc: "Instantly create presentations from your notes or topics." ,img:"./PPT Generator.png",url:"./pptgenerator"},
   { name: "Quiz Generator", desc: "Generate interactive quizzes from your study material." ,img:"./Quiz Generator.png",url:"/quizgenerator"},
-  { name: "Assignment Solver", desc: "Solve and explain assignment questions step-by-step.",img:"./Assignment Solver.png" }
+  { name: "Assignment Solver", desc: "Solve and explain assignment questions step-by-step.",img:"./Assignment Solver.png",url:"./assignment" }
 ];
 
 const GreenCircle = () => {

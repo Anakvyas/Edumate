@@ -11,7 +11,10 @@ import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 from google.cloud import vision
 import google.generativeai as genai
-from helpers import text_to_pdf_buffer,upload_pdf_to_s3
+from helpers import text_to_pdf_buffer,upload_pdf_to_s3,upload_vectorstore_to_s3
+from utils import process_pdf_rag
+import uuid
+import shutil
 
 
 
@@ -95,42 +98,62 @@ def extract_pdf(bucket,key):
 client = vision.ImageAnnotatorClient()
 
 def run_vision(bucket,key):
-    obj =  s3.get_object(Bucket=bucket,Key= key)
-    bytes = obj["Body"].read()
+    try:
+        obj =  s3.get_object(Bucket=bucket,Key= key)
+        bytes = obj["Body"].read()
 
-    result = ""
-    pdf = fitz.open(stream=bytes, filetype="pdf")
+        result = ""
+        pdf = fitz.open(stream=bytes, filetype="pdf")
 
-    for i in range(len(pdf)):
-        page = pdf[i]
-        pix = page.get_pixmap(dpi=300)
-        img_bytes = pix.tobytes("png")
-        image = vision.Image(content=img_bytes)
-        response = client.document_text_detection(image=image)
-        text = response.text_annotations[0].description.strip()
+        for i in range(len(pdf)):
+            page = pdf[i]
+            pix = page.get_pixmap(dpi=300)
+            img_bytes = pix.tobytes("png")
+            image = vision.Image(content=img_bytes)
+            response = client.document_text_detection(image=image)
+            text = response.text_annotations[0].description.strip()
 
-        prompt = f"""
-        Refine the following handwritten text extracted by OCR.
-        - Correct spelling errors
-        - Add punctuation
-        - Maintain the original meaning and paragraph breaks
-        - Format clearly for readability
-        - return only refined text not any prefixed prompt or explanation
-        Text:
-        {text}
-        """
+            prompt = f"""
+            Refine the following handwritten text extracted by OCR.
+            - Correct spelling errors
+            - Add punctuation
+            - Maintain the original meaning and paragraph breaks
+            - Format clearly for readability
+            - return only refined text not any prefixed prompt or explanation
+            Text:
+            {text}
+            """
 
-        model = genai.GenerativeModel("models/gemini-2.0-flash")
-        refined_response = model.generate_content(prompt)
-        refined_text = refined_response.text.strip()
+            model = genai.GenerativeModel("models/gemini-2.0-flash")
+            refined_response = model.generate_content(prompt)
+            refined_text = refined_response.text.strip()
 
-        # result.append(refined_text)
-        # print(refined_text)
-        result+=refined_text
-        result+=" "
+            # result.append(refined_text)
+            # print(refined_text)
+            result+=refined_text
+            result+=" "
+        
+        bytes = text_to_pdf_buffer(result)
+        url = upload_pdf_to_s3(bytes,bucket)
+        tmp_pdf_path = f"./uploadfiles/{uuid.uuid4()}.pdf"
+        with open(tmp_pdf_path, "wb") as f:
+                f.write(bytes)
+        persist_dir = f"./vectorstores/{uuid.uuid4()}"
+        process_pdf_rag(tmp_pdf_path, persist_dir)
+        vectorstore_uri = upload_vectorstore_to_s3(persist_dir, bucket)
+
+        shutil.rmtree(persist_dir, ignore_errors=True)
+
+        os.remove(tmp_pdf_path)
+
+        return {
+            "pdf_url": url,             
+            "vectorstore": persist_dir
+        }, 200
+
+    except Exception as e:
+        print(e)
+        return {"error":e}
     
-    bytes = text_to_pdf_buffer(result)
-    url = upload_pdf_to_s3(bytes,bucket)
-    return url
 
 

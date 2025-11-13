@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import s3 from '../.././utils/s3';
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import axios from "axios";
-
+import { connectDB } from "../../utils/db";
+import Document from "../../lib/Document";
 export async function POST(req:NextRequest,res:NextResponse){
     try{
         const formdata = await req.formData();
@@ -29,10 +30,21 @@ export async function POST(req:NextRequest,res:NextResponse){
 
         const res = await axios.post(process.env.NEXT_PUBLIC_BACKEND_URL+"/vision_ocr",{key,bucket,userID});
 
-        // console.log(res.data.url)
-        const url = res.data.url
+        // console.log(res.data)
+        const url = res.data.pdflink[0];
+        const pdflink = url.pdf_url;
+        const persist_dir = url.vectorstore;
 
-        return NextResponse.json({"url":url},{status:200})
+        await connectDB();
+
+        await Document.create({
+            userID :userID,
+            handwrittenS3_pdfkey:key,
+            pdf_link:pdflink,
+            persist_dir :persist_dir
+        })
+
+        return NextResponse.json({"pdflink":pdflink},{status:200})
 
     }catch(err:any){
         console.log(err)

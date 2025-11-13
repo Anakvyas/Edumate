@@ -7,6 +7,7 @@ import { div } from 'framer-motion/client';
 import handleDownloadPdf from '../utils/downlaodpdf';
 import axios from 'axios';
 import PdfViewer from '../components/pdfViewer';
+import Back from '../components/Back';
 
 const Page = () => {
     const [file, setfile] = useState<File | null>(null);
@@ -82,6 +83,8 @@ const Page = () => {
     }
 
     return (
+        <div className='relative'>
+            <Back/>
         <div className='flex flex-col jsutify-center items-center p-5  text-font'>
             <input className='hidden' ref={fileInputRef} type='file' accept='video/*' onChange={handlefilechange} />
             <motion.div className='bg-[linear-gradient(120deg,#7dd87d,#5e63b6)] p-[0.9px] rounded-xl'
@@ -135,6 +138,7 @@ const Page = () => {
                 </div>
 
             </motion.div>
+        </div>
         </div>
     );
 }

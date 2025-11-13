@@ -9,9 +9,11 @@ from prompts import summary_prompt, event_prompt, topic_prompt,project_prompt,su
 from langchain_community.document_loaders import  PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
+from sentence_transformers import SentenceTransformer
 import gc
 import chromadb
 from langchain_chroma import Chroma
+from sklearn.cluster import KMeans
 
 
 load_dotenv()
@@ -43,6 +45,9 @@ def extract_events(transcript):
     return events if events else "[]"
 
 
+
+
+
 def process_pdf_rag(path, persist_dir):
     loader = PyPDFLoader(path, mode="single")
     docs = loader.load()
@@ -54,7 +59,8 @@ def process_pdf_rag(path, persist_dir):
     chunks = text_splitter.split_documents(docs)
 
     embedding = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        model_kwargs={"device": "cpu"}
     )
 
     client = chromadb.PersistentClient(
@@ -80,7 +86,8 @@ def process_pdf_rag(path, persist_dir):
 
 def load_vector_store(persist_dir):
     embedding = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
+         model_kwargs={"device": "cpu"}
     )
 
     client = chromadb.PersistentClient(
@@ -96,6 +103,30 @@ def load_vector_store(persist_dir):
     )
     
     return vector_store.as_retriever()
+
+def load_all_chunks(persist_dir):
+    client = chromadb.PersistentClient(
+        path=persist_dir,
+        settings=Settings(anonymized_telemetry=False)
+    )
+
+    collection = client.get_collection("pdf_store")
+    data = collection.get(include=["documents"])
+
+    return data["documents"] 
+
+
+# embed_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+
+# def cluster_chunks(chunks, k=6):
+#     embeddings = embed_model.encode(chunks)
+#     kmeans = KMeans(n_clusters=k, random_state=42).fit(embeddings)
+
+#     clustered = {i: [] for i in range(k)}
+#     for idx, label in enumerate(kmeans.labels_):
+#         clustered[label].append(chunks[idx])
+
+#     return clustered
 
 
 
@@ -145,5 +176,5 @@ def generate_streamlit_project(topic):
 def  generate_question(prompt,content):
     result = generate_ques.invoke({"prompt":prompt,"content":content})
     # print(result)
-    res = result["text"]
+    res = result.content
     return res
