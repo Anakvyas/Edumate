@@ -104,14 +104,14 @@ const Navbar = () => {
 
       {authorized ? (
         <button
-          className="border border-[#01664d] px-3 py-2 rounded-xl shadow-[0_6px_22px_0_#002e29,inset_0_-8px_20px_0_rgba(0,255,192,0.15)] hover:bg-gray-900"
+          className="border border-[#01664d] px-3 py-2 rounded-xl shadow-[0_6px_22px_0_#002e29,inset_0_-8px_20px_0_rgba(0,255,192,0.15)] hover:bg-gray-900 cursor-pointer"
           onClick={handleLogout}
         >
           Logout
         </button>
       ) : (
         <button
-          className="border border-[#01664d] px-3 py-2 rounded-xl shadow-[0_6px_22px_0_#002e29,inset_0_-8px_20px_0_rgba(0,255,192,0.15)] hover:bg-gray-900"
+          className="border border-[#01664d] px-3 py-2 rounded-xl shadow-[0_6px_22px_0_#002e29,inset_0_-8px_20px_0_rgba(0,255,192,0.15)] hover:bg-gray-900 cursor-pointer"
           onClick={handleLogin}
         >
           Login with Outlook
