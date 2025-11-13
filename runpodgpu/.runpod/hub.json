@@ -1,0 +1,24 @@
+{
+  "title": "Runpod Whisper Finetune",
+  "description": "Serverless GPU endpoint combining Whisper video/audio transcription and TrOCR image fine-tuning.",
+  "type": "serverless",
+  "category": ["image", "video"],
+  "iconUrl": "https://cdn-icons-png.flaticon.com/512/3602/3602123.png",
+  "config": {
+    "runOn": "GPU",
+    "containerDiskInGb": 20,
+    "presets": [
+      {
+        "name": "T4 GPU (Spot)",
+        "gpu": "NVIDIA T4",
+        "gpuCount": 1,
+        "cpuCount": 2,
+        "memoryInGb": 8,
+        "minWorkers": 0,
+        "maxWorkers": 1,
+        "timeoutInSeconds": 900,
+        "useSpot": true
+      }
+    ]
+  }
+}
