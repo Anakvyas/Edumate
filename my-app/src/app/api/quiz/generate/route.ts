@@ -5,7 +5,7 @@ import Quiz from "../../lib/Quiz";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import axios from "axios";
 
-export async function POST(req: NextRequest, res: NextResponse) {
+export async function POST(req: NextRequest) {
     try {
         const formdata = await req.formData();
         const userID = formdata.get("userID") || "demo";

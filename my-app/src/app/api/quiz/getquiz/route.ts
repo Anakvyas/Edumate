@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Quiz from "../../lib/Quiz";
 import { ObjectId } from "mongodb";
 
-export async function POST(req:NextRequest,res :NextResponse){
+export async function POST(req:NextRequest){
     try{
         const {id} = await req.json();
         const quiz =  await Quiz.findById(new ObjectId(id));

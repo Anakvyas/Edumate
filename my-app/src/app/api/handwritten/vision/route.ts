@@ -4,7 +4,8 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import axios from "axios";
 import { connectDB } from "../../utils/db";
 import Document from "../../lib/Document";
-export async function POST(req:NextRequest,res:NextResponse){
+
+export async function POST(req:NextRequest){
     try{
         const formdata = await req.formData();
         const userID = formdata.get("userID") || "demo"

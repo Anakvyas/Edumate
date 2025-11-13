@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import Quiz from "../../lib/Quiz";
 import { ObjectId } from "mongodb";
 
-export async function POST(req: NextRequest, res: NextResponse) {
+export async function POST(req: NextRequest) {
     try {
         const { quizid, questionId, choosenAnswer } = await req.json();
         // console.log(quizid,questionId,choosenAnswer)
