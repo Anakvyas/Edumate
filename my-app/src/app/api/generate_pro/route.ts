@@ -94,6 +94,10 @@ RETURN THIS JSON STRUCTURE:
 
   } catch (err: any) {
     console.log(err);
+     return NextResponse.json(
+      { error: err.message || "Server error occurred." },
+      { status: 500 }
+    );
   }
 }
 
