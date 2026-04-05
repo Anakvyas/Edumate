@@ -1,146 +1,211 @@
 "use client";
-import { motion } from 'framer-motion';
-import { FileDown, FileUp, NotebookText, Upload, Video, Youtube } from 'lucide-react';
-import React, { useState, useRef } from 'react';
-import UploadDialog from '../components/Loading';
-import { div } from 'framer-motion/client';
-import handleDownloadPdf from '../utils/downlaodpdf';
-import axios from 'axios';
-import PdfViewer from '../components/pdfViewer';
-import Back from '../components/Back';
+
+import { motion } from "framer-motion";
+import { AlertCircle, FileUp, Loader2, Upload, Youtube } from "lucide-react";
+import React, { useRef, useState } from "react";
+import axios from "axios";
+
+import Back from "../components/Back";
+import UploadDialog from "../components/Loading";
+import PdfViewer from "../components/pdfViewer";
+
+const steps = [
+  "Upload a lecture recording or paste a YouTube link",
+  "Transcribe the audio locally with Whisper on CPU",
+  "Turn the transcript into revision-friendly notes",
+];
 
 const Page = () => {
-    const [file, setfile] = useState<File | null>(null);
-    const fileInputRef = useRef<HTMLInputElement | null>(null);
-    const [dragging, setdragging] = useState(false);
-    const [showdialog, setshowdialog] = useState(false);
-    const [notes, setnotes] = useState(false);
-    const pdfcontent = useRef(null);
-    const [youtubelink , setyoutubelink] = useState("");
-    const [notesText,setnotesText] = useState("")
-    const [pdflink,setpdflink] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
+  const [status, setStatus] = useState<"loading" | "done">("loading");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [youtubeLink, setYoutubeLink] = useState("");
+  const [pdfLink, setPdfLink] = useState("");
+  const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    const handleclick = () => {
-        fileInputRef.current?.click();
+  const handleClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextFile = event.target.files?.[0] || null;
+    setFile(nextFile);
+    setError("");
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragging(false);
+
+    const droppedFile = event.dataTransfer.files[0];
+    if (droppedFile && droppedFile.type.startsWith("video/")) {
+      setFile(droppedFile);
+      setError("");
     }
-    const handlefilechange = (e: any) => {
-        const file = e.target.files[0];
-        setfile(file);
-        console.log(file);
-    }
+  };
 
-    const handledrop = (e: any) => {
-        e.preventDefault();
-        const droppedFile = e.dataTransfer.files[0];
-        if (droppedFile && droppedFile.type.startsWith("video/")) {
-            setfile(droppedFile)
-        }
-    }
-
-    const handledragover = (e: any) => {
-        e.preventDefault();
-        setdragging(true);
-    }
-
-    const handledragLeave = (e: any) => {
-        e.preventDefault();
-        setdragging(false);
-    }
-
-    const handlegetnotes = async() => {
-        if(!file && !youtubelink){
-            return;
-        }
-        // youtube
-        const formdata = new FormData()
-        if(file){
-            formdata.append('video',file);
-            formdata.append('mode',"video");
-        }else if(youtubelink){
-            formdata.append('video',youtubelink);
-            formdata.append("mode","yt");
-        }
-
-        const res =  await axios.post('/api/video',formdata,{
-            headers:{
-                "Content-Type":"multipart/form-data"
-            }
-        })
-
-
-        setpdflink(res.data.link)
-
-
+  const handleGetNotes = async () => {
+    if (!file && !youtubeLink.trim()) {
+      setError("Upload a video or paste a YouTube link first.");
+      return;
     }
 
-    const handledownloadpdf = ()=>{
-        const el = pdfcontent.current;
-        if(el != null) handleDownloadPdf(el)
+    try {
+      setError("");
+      setIsSubmitting(true);
+      setShowDialog(true);
+      setStatus("loading");
+
+      const formdata = new FormData();
+      if (file) {
+        formdata.append("video", file);
+        formdata.append("mode", "video");
+      } else {
+        formdata.append("video", youtubeLink.trim());
+        formdata.append("mode", "yt");
+      }
+
+      const response = await axios.post("/api/video", formdata, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      setStatus("done");
+      setTimeout(() => {
+        setPdfLink(response.data.link);
+      }, 700);
+    } catch (err: any) {
+      setShowDialog(false);
+      setError(err?.response?.data?.message || "We could not generate notes for this video.");
+    } finally {
+      setIsSubmitting(false);
     }
+  };
 
-    if(pdflink != ""){
-        return <PdfViewer pdfurl={pdflink}></PdfViewer>
-    }
+  if (pdfLink) {
+    return <PdfViewer pdfurl={pdfLink} />;
+  }
 
-    return (
-        <div className='relative'>
-            <Back/>
-        <div className='flex flex-col jsutify-center items-center p-5  text-font'>
-            <input className='hidden' ref={fileInputRef} type='file' accept='video/*' onChange={handlefilechange} />
-            <motion.div className='bg-[linear-gradient(120deg,#7dd87d,#5e63b6)] p-[0.9px] rounded-xl'
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ duration: 0.7, ease: "easeInOut" }}  >
-                <div className="bg-[#101314] max-w-[760px] margin-auto min-h-auto flex flex-col  items-center p-7 rounded-xl">
-                    <h1 className='text-2xl text-gray-100 head-font'>Video Transcriber</h1>
-                    <span className='text-md text-gray-500'>Convert lecture videos into text notes.</span>
-                    {!notes ? (<>
-                        <div className='p-10'>
-                            <h1 className='text-md text-gray-300 mb-2 flex flex-row gap-4'> <Upload /> Upload Video Here</h1>
-                            <div className={`w-lg h-[180px] ${dragging ? "bg-gray-700" : "bg-[#566064]"} text-white border border-[#7dd87d] border-dashed border-2 rounded-xl flex flex-col justify-center items-center transition-all hover:bg-gray-700 cursor-pointer`}
-                                onClick={handleclick}
-                                onDrop={handledrop}
-                                onDragOver={handledragover}
-                                onDragLeave={handledragLeave}
-                            >
+  return (
+    <div className="relative">
+      <Back />
+      <div className="flex flex-col jsutify-center items-center p-5 text-font">
+        <input
+          className="hidden"
+          ref={fileInputRef}
+          type="file"
+          accept="video/*"
+          onChange={handleFileChange}
+        />
+        <motion.div
+          className="rounded-xl bg-[linear-gradient(120deg,#7dd87d,#5e63b6)] p-[0.9px]"
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: "easeInOut" }}
+        >
+          <div className="flex min-h-auto max-w-[760px] flex-col items-center rounded-xl bg-[#101314] p-7">
+            <h1 className="head-font text-2xl text-gray-100">Video Transcriber</h1>
+            <span className="text-md text-center text-gray-500">
+              Convert lecture videos into clean study notes.
+            </span>
 
-                                {file ? (<span className='flex flex-col justify-center items-center'>{file.name}</span>) : (<p className='flex flex-col justify-center items-center'>
-                                    <FileUp className="mb-2 w-[60px] h-[50px]" />
-                                    <i>Click to uplaod, or drag Video here</i></p>)}
-                            </div>
-                        </div>
+            <div className="mt-5 grid w-full max-w-[680px] grid-cols-1 gap-3 md:grid-cols-3">
+              {steps.map((step, index) => (
+                <motion.div
+                  key={step}
+                  className="rounded-xl border border-[#7dd87d]/20 bg-[#15191b] px-4 py-4 text-center text-sm text-gray-300"
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.08, duration: 0.35 }}
+                >
+                  <span className="block text-xs uppercase tracking-[0.2em] text-[#7dd87d]">
+                    Step {index + 1}
+                  </span>
+                  <span className="mt-2 block">{step}</span>
+                </motion.div>
+              ))}
+            </div>
 
-                        <h2 className='text-white text-xl font-bolder'>OR</h2>
-                        <div className='p-10'>
-                            <h1 className='text-md text-gray-300 mb-2 flex flex-row gap-4'> <Youtube />Paste Youtube Link Here</h1>
-                            <input className='w-lg h-[40px] p-2 text bg-[#566064] text-gray-100 rouned-xl outline-none rounded-lg' type='text' placeholder='https://www.youtube.com/'value={youtubelink} onChange={(e)=>setyoutubelink(e.target.value)} ></input>
-                        </div>
+            <div className="p-10">
+              <h1 className="mb-2 flex flex-row gap-4 text-md text-gray-300">
+                <Upload /> Upload Video Here
+              </h1>
+              <div
+                className={`h-[180px] w-lg cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#7dd87d] text-white transition-all hover:bg-gray-700 ${
+                  dragging ? "bg-gray-700" : "bg-[#566064]"
+                } flex`}
+                onClick={handleClick}
+                onDrop={handleDrop}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={(event) => {
+                  event.preventDefault();
+                  setDragging(false);
+                }}
+              >
+                {file ? (
+                  <span className="flex flex-col items-center justify-center">{file.name}</span>
+                ) : (
+                  <p className="flex flex-col items-center justify-center">
+                    <FileUp className="mb-2 h-[50px] w-[60px]" />
+                    <i>Click to upload, or drag video here</i>
+                  </p>
+                )}
+              </div>
+            </div>
 
-                        <button className="w-sm bg-gradient-to-r from-[#098009] to-[#7dd87d] p-2 rounded-xl cursor-pointer text-gray-800 font-semibold transition-all duration-300 hover:from-[#0ca50c] hover:to-[#98f598] hover:scale-105 shadow-md" onClick={handlegetnotes}>
-                            GET NOTES
-                        </button>
+            <h2 className="text-xl font-bolder text-white">OR</h2>
+            <div className="p-10">
+              <h1 className="mb-2 flex flex-row gap-4 text-md text-gray-300">
+                <Youtube />
+                Paste Youtube Link Here
+              </h1>
+              <input
+                className="h-[40px] w-lg rounded-lg bg-[#566064] p-2 text text-gray-100 outline-none"
+                type="text"
+                placeholder="https://www.youtube.com/"
+                value={youtubeLink}
+                onChange={(event) => {
+                  setYoutubeLink(event.target.value);
+                  setError("");
+                }}
+              />
+            </div>
 
-                        {/* <UploadDialog show={showdialog} onClose={() => setshowdialog(false)} /> */}
-                    </>)
-                        :
-                        (<div className='bg-[#101314] w-full h-auto p-4 text-white'>
-                            <div className='flex flex-col items-start'>
-                                <h2 className='flex flex-row text-xl font-bolder gap-5  justify-center items-center mb-3'> <Video />Uploaded Video : </h2>
-                                <div className='w-lg h-[40px] p-2 text bg-[#566064] text-gray-100 rouned-xl outline-none rounded-lg ml-8 mb-8'>{file?.name}</div>
-                                <div className=' w-full flex flex-row justify-between items-center'>
-                                    <h2 className='flex flex-row text-xl font-bolder gap-5 justify-center items-center mb-3 text-xl font-bolder'><NotebookText /> Notes</h2>
-                                    <button className='text-gray-900 bg-[linear-gradient(to_right,#7dd87d,#5e63b6)] flex flex-row gap-3 w-auto h-auto bg-red-500 p-[4px] rounded-lg cursor-pointer rounded-lg hover:scale-105 transition-all duration-300 shadow-md'
-                                        onClick={handledownloadpdf}><FileDown /> Download Notes Pdf</button>
-                                </div>
-                                <div ref = {pdfcontent} className='max-h-[900px] p-6 bg-white text-gray-900 m-5 rounded-lg overflow-y-auto scrollbar-thin text-[15px]' dangerouslySetInnerHTML={{ __html: notesText }}/>
-                            </div>
-                        </div>)}
-                </div>
+            {error ? (
+              <div className="mb-5 flex w-full max-w-[680px] items-center gap-3 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                <AlertCircle className="h-5 w-5 shrink-0" />
+                <span>{error}</span>
+              </div>
+            ) : null}
 
-            </motion.div>
-        </div>
-        </div>
-    );
-}
+            <button
+              className="flex w-sm cursor-pointer items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-[#098009] to-[#7dd87d] p-2 font-semibold text-gray-800 shadow-md transition-all duration-300 hover:scale-105 hover:from-[#0ca50c] hover:to-[#98f598] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
+              onClick={handleGetNotes}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+              {isSubmitting ? "GENERATING NOTES..." : "GET NOTES"}
+            </button>
+
+            <UploadDialog
+              show={showDialog}
+              onClose={() => setShowDialog(false)}
+              status={status}
+              title="Generating your video notes..."
+              subtitle="We are downloading audio, transcribing it on CPU, and turning it into revision-ready notes."
+            />
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  );
+};
 
 export default Page;

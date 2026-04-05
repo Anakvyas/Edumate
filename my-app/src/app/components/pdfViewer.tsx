@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Worker, Viewer } from "@react-pdf-viewer/core";
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import { selectionModePlugin } from '@react-pdf-viewer/selection-mode';
-import { BookCheck, CircleQuestionMark, MessageCircle, NotebookPen, Rocket, Undo2 } from 'lucide-react';
+import { BookCheck, CircleQuestionMark, MessageCircle, NotebookPen, Rocket, ScanText, Undo2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import axios from 'axios';
 import GenerateProject from './pdf_comp/GenerateProject';
@@ -12,9 +12,10 @@ import QuizGenerator from './pdf_comp/QuizGenerator';
 import ShortNotes from './pdf_comp/ShortNotes';
 import ChatWithPdf from './pdf_comp/ChatWithPdf';
 import ConeptMap from './pdf_comp/ConeptMap';
+import RawOcrPreview from './pdf_comp/RawOcrPreview';
 import Back from './Back';
 
-const pdffeature = [  
+const pdffeature = [
   { name: "Chat with PDF", icon: MessageCircle,comp:ChatWithPdf },
   { name: "Get Short Notes", icon: NotebookPen,comp:ShortNotes },
   { name: "Generate Projects", icon: Rocket,comp:GenerateProject },
@@ -22,7 +23,12 @@ const pdffeature = [
   { name: "Concept Maps Generator", icon: BookCheck ,comp:ConeptMap},
 ];
 
-const PdfViewer = ({ pdfurl }: { pdfurl: string }) => {
+type OcrPage = {
+  page: number;
+  text: string;
+};
+
+const PdfViewer = ({ pdfurl, ocrPages = [] }: { pdfurl: string; ocrPages?: OcrPage[] }) => {
   // const [pdfurl, setpdfurl] = useState("");
   const selectionPlugin = selectionModePlugin();
   const [top, settop] = useState<Number | null>(null)
@@ -30,6 +36,9 @@ const PdfViewer = ({ pdfurl }: { pdfurl: string }) => {
   const [selectedText, setSelectedText] = useState("");
   const [selectedfeature, setSelectedfeature] = useState<number | null>(null);
   const [persit_dir, setpersit_dir] = useState("");
+  const featureList = ocrPages.length > 0
+    ? [{ name: "View Raw OCR", icon: ScanText, kind: "ocr" as const }, ...pdffeature.map((feature) => ({ ...feature, kind: "tool" as const }))]
+    : pdffeature.map((feature) => ({ ...feature, kind: "tool" as const }));
 
 
   const handleSelect = (event: React.MouseEvent) => {
@@ -130,7 +139,7 @@ const PdfViewer = ({ pdfurl }: { pdfurl: string }) => {
               </p>
 
               <div className="flex flex-col gap-4 mt-2">
-                {pdffeature.map((features, index) => {
+                {featureList.map((features, index) => {
                   const Icon = features.icon;
                   return (
                     <button
@@ -168,17 +177,21 @@ const PdfViewer = ({ pdfurl }: { pdfurl: string }) => {
               </div>
 
               {(() => {
-                const Icon = pdffeature[selectedfeature].icon;
-                const Comp = pdffeature[selectedfeature].comp;
+                const selectedItem = featureList[selectedfeature];
+                const Icon = selectedItem.icon;
                 return (
                   <div className='w-full h-[67vh]'>
                     <div className="flex items-center gap-3 m-2">
                       <Icon size={32} className="text-white" />
                       <h2 className="text-2xl text-white font-semibold">
-                        {pdffeature[selectedfeature].name}
+                        {selectedItem.name}
                       </h2>
                     </div>
-                    <Comp persist_dir={persit_dir} />
+                    {selectedItem.kind === "ocr" ? (
+                      <RawOcrPreview ocrPages={ocrPages} />
+                    ) : (
+                      <selectedItem.comp persist_dir={persit_dir} />
+                    )}
 
                   </div>
                 );

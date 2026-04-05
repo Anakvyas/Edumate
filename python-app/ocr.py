@@ -1,159 +1,219 @@
+import io
+import os
+import shutil
+import uuid
+from pathlib import Path
+
 import boto3
 import fitz
-from PIL import Image
-from transformers import TrOCRProcessor, VisionEncoderDecoderModel
-import torch
-import io
-from dotenv import load_dotenv
-import cv2
-import numpy as np
 import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 from google.cloud import vision
-import google.generativeai as genai
-from helpers import text_to_pdf_buffer,upload_pdf_to_s3,upload_vectorstore_to_s3
+from google.oauth2 import service_account
+from PIL import Image
+
+import env_config  # noqa: F401
+from helpers import text_to_pdf_buffer, upload_pdf_to_s3, upload_vectorstore_to_s3
+from openrouter_client import prompt_completion
 from utils import process_pdf_rag
-import uuid
-import shutil
 
 
+TESSERACT_CMD = os.getenv("TESSERACT_CMD") or shutil.which("tesseract")
+HANDWRITING_OCR_PROVIDER = os.getenv("HANDWRITING_OCR_PROVIDER") or "google_vision"
+GOOGLE_VISION_CREDENTIALS_PATH = os.getenv("GOOGLE_VISION_CREDENTIALS_PATH") or "../fourth-amp-476617-j8-f7a43bf7a0c0.json"
 
-load_dotenv()
-import os
+_google_vision_client = None
+
+if TESSERACT_CMD:
+    pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
+
+
 s3 = boto3.client(
     "s3",
-    aws_access_key_id= os.getenv("AWS_ACCESS_KEY_ID"),
+    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
     aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-    region_name="eu-north-1"
+    region_name="eu-north-1",
 )
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-
-
-# model_name = "microsoft/trocr-base-printed"
-# processor = TrOCRProcessor.from_pretrained(model_name, local_files_only=True)
-# model = VisionEncoderDecoderModel.from_pretrained(model_name, local_files_only=True)
-# device = "cuda" if torch.cuda.is_available() else "cpu"
-# model.to(device)
-
-# def ocr_line(img):
-#     pixel_values = processor(images=img, return_tensors="pt").pixel_values.to(device)
-#     generated_ids = model.generate(pixel_values, max_length=512)
-#     text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-#     return text
-
-
-def extract_pdf(bucket,key):
-    obj =  s3.get_object(Bucket=bucket,Key= key)
-    bytes = obj["Body"].read()
+def extract_pdf(bucket, key):
+    obj = s3.get_object(Bucket=bucket, Key=key)
+    file_bytes = obj["Body"].read()
 
     result = []
-    pdf = fitz.open(stream=bytes, filetype="pdf")
-
-    print("pdf",len(pdf))
+    pdf = fitz.open(stream=file_bytes, filetype="pdf")
 
     for i in range(len(pdf)):
         page = pdf[i]
-        print(i)
         extracted = page.get_text()
 
         if extracted.strip():
-            result.append({i+1:extracted})
+            result.append({i + 1: extracted})
         else:
             pix = page.get_pixmap(dpi=300)
             img_bytes = pix.tobytes("png")
             img = Image.open(io.BytesIO(img_bytes))
-            # img_cv = np.array(img)
-
-            # # ✅ Threshold & find horizontal contours (text lines)
-            # thresh = cv2.threshold(img_cv, 150, 255, cv2.THRESH_BINARY_INV)[1]
-            # kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 3))
-            # dilate = cv2.dilate(thresh, kernel, iterations=2)
-
-            # contours, _ = cv2.findContours(dilate, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            # contours = sorted(contours, key=lambda c: cv2.boundingRect(c)[1])  # sort by Y (top→bottom)
-
-            # page_text = []
-
-            # for cnt in contours:
-            #     x, y, w, h = cv2.boundingRect(cnt)
-            #     line_img = img_cv[y:y+h, x:x+w]
-
-            #     pil_line = Image.fromarray(line_img).convert("RGB")
-
-            #     text = ocr_line(pil_line)
-            #     if text:
-            #         page_text.append(text)
-
             text = pytesseract.image_to_string(img, lang="eng")
-            result.append({i+1:text})
+            result.append({i + 1: text})
 
     return result
 
 
-#  for Handwritten pdf
+def require_tesseract():
+    if not pytesseract.pytesseract.tesseract_cmd or not Path(pytesseract.pytesseract.tesseract_cmd).exists():
+        raise RuntimeError(
+            "Tesseract is not available. Install tesseract or set TESSERACT_CMD in python-app/.env."
+        )
 
-# using google vision 
-client = vision.ImageAnnotatorClient()
 
-def run_vision(bucket,key):
+def resolve_google_vision_credentials_path():
+    configured_path = Path(GOOGLE_VISION_CREDENTIALS_PATH).expanduser()
+    if configured_path.is_absolute() and configured_path.exists():
+        return configured_path
+
+    repo_relative = (Path(__file__).resolve().parent / configured_path).resolve()
+    if repo_relative.exists():
+        return repo_relative
+
+    root_relative = (Path(__file__).resolve().parent.parent / configured_path).resolve()
+    if root_relative.exists():
+        return root_relative
+
+    default_repo_path = Path(__file__).resolve().parent.parent / "fourth-amp-476617-j8-f7a43bf7a0c0.json"
+    if default_repo_path.exists():
+        return default_repo_path
+
+    return None
+
+
+def get_google_vision_client():
+    global _google_vision_client
+
+    if _google_vision_client is not None:
+        return _google_vision_client
+
+    credentials_path = resolve_google_vision_credentials_path()
+    if credentials_path is None:
+        return None
+
+    credentials = service_account.Credentials.from_service_account_file(str(credentials_path))
+    _google_vision_client = vision.ImageAnnotatorClient(credentials=credentials)
+    return _google_vision_client
+
+
+def extract_handwritten_text_with_google_vision(image_bytes):
+    client = get_google_vision_client()
+    if client is None:
+        raise RuntimeError(
+            "Google Vision credentials were not found. Set GOOGLE_VISION_CREDENTIALS_PATH in python-app/.env."
+        )
+
+    response = client.document_text_detection(image=vision.Image(content=image_bytes))
+    if response.error.message:
+        raise RuntimeError(f"Google Vision OCR failed: {response.error.message}")
+
+    annotation = response.full_text_annotation
+    if annotation and annotation.text:
+        return annotation.text.strip()
+
+    text_annotation = response.text_annotations
+    if text_annotation:
+        return text_annotation[0].description.strip()
+
+    return ""
+
+
+def extract_handwritten_text(image_bytes):
+    if HANDWRITING_OCR_PROVIDER != "google_vision":
+        raise RuntimeError("Handwritten OCR is configured to use only Google Vision.")
+
+    image = Image.open(io.BytesIO(image_bytes))
+    output = io.BytesIO()
+    image.save(output, format="PNG")
+    return extract_handwritten_text_with_google_vision(output.getvalue())
+
+
+def refine_handwritten_notes(raw_text):
+    cleaned_input = (raw_text or "").strip()
+    if not cleaned_input:
+        return ""
+
+    prompt = f"""
+You are cleaning OCR output from handwritten class notes.
+
+Rules:
+- Preserve the original meaning and order.
+- Do not add new facts, examples, or explanations.
+- Do not summarize or shorten the notes.
+- Fix obvious OCR mistakes like broken words, punctuation, spacing, and line breaks.
+- Keep technical terms when present.
+- Turn fragmented lines into readable, organized notes.
+- Use headings and bullet points only when they match the existing content.
+- If a line is uncertain, keep it close to the OCR instead of inventing text.
+- Return only the cleaned notes text.
+
+Raw OCR text:
+{cleaned_input}
+"""
+
+    refined_text = prompt_completion(prompt, temperature=0.1)
+    return refined_text.strip() or cleaned_input
+
+
+def run_vision(bucket, key):
     try:
-        obj =  s3.get_object(Bucket=bucket,Key= key)
-        bytes = obj["Body"].read()
+        obj = s3.get_object(Bucket=bucket, Key=key)
+        file_bytes = obj["Body"].read()
 
-        result = ""
-        pdf = fitz.open(stream=bytes, filetype="pdf")
+        result_parts = []
+        ocr_pages = []
+        pdf = fitz.open(stream=file_bytes, filetype="pdf")
 
         for i in range(len(pdf)):
             page = pdf[i]
-            pix = page.get_pixmap(dpi=300)
+            pix = page.get_pixmap(dpi=400)
             img_bytes = pix.tobytes("png")
-            image = vision.Image(content=img_bytes)
-            response = client.document_text_detection(image=image)
-            text = response.text_annotations[0].description.strip()
+            ocr_text = extract_handwritten_text(img_bytes)
+            if ocr_text:
+                result_parts.append(ocr_text)
+                ocr_pages.append({
+                    "page": i + 1,
+                    "text": ocr_text,
+                })
 
-            prompt = f"""
-            Refine the following handwritten text extracted by OCR.
-            - Correct spelling errors
-            - Add punctuation
-            - Maintain the original meaning and paragraph breaks
-            - Format clearly for readability
-            - return only refined text not any prefixed prompt or explanation
-            Text:
-            {text}
-            """
+        final_text = "\n\n".join(result_parts).strip()
+        if not final_text:
+            raise RuntimeError("No handwritten text could be extracted from the PDF.")
 
-            model = genai.GenerativeModel("models/gemini-2.0-flash")
-            refined_response = model.generate_content(prompt)
-            refined_text = refined_response.text.strip()
+        refined_text = refine_handwritten_notes(final_text)
+        pdf_bytes = text_to_pdf_buffer(refined_text)
+        pdf_url = upload_pdf_to_s3(pdf_bytes, bucket)
 
-            # result.append(refined_text)
-            # print(refined_text)
-            result+=refined_text
-            result+=" "
-        
-        bytes = text_to_pdf_buffer(result)
-        url = upload_pdf_to_s3(bytes,bucket)
-        tmp_pdf_path = f"./uploadfiles/{uuid.uuid4()}.pdf"
-        with open(tmp_pdf_path, "wb") as f:
-                f.write(bytes)
-        persist_dir = f"./vectorstores/{uuid.uuid4()}"
-        process_pdf_rag(tmp_pdf_path, persist_dir)
-        vectorstore_uri = upload_vectorstore_to_s3(persist_dir, bucket)
+        upload_dir = Path("./uploadfiles")
+        vectorstore_dir = Path("./vectorstores")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        vectorstore_dir.mkdir(parents=True, exist_ok=True)
 
-        shutil.rmtree(persist_dir, ignore_errors=True)
+        tmp_pdf_path = upload_dir / f"{uuid.uuid4()}.pdf"
+        with open(tmp_pdf_path, "wb") as file_obj:
+            file_obj.write(pdf_bytes)
 
-        os.remove(tmp_pdf_path)
+        persist_dir = vectorstore_dir / str(uuid.uuid4())
+        process_pdf_rag(str(tmp_pdf_path), str(persist_dir))
+        upload_vectorstore_to_s3(str(persist_dir), bucket)
+
+        if persist_dir.exists():
+            shutil.rmtree(persist_dir, ignore_errors=True)
+        if tmp_pdf_path.exists():
+            tmp_pdf_path.unlink()
 
         return {
-            "pdf_url": url,             
-            "vectorstore": persist_dir
-        }, 200
+            "pdf_url": pdf_url,
+            "vectorstore": str(persist_dir),
+            "ocr_pages": ocr_pages,
+            "raw_text": final_text,
+            "refined_text": refined_text,
+        }
 
-    except Exception as e:
-        print(e)
-        return {"error":e}
-    
-
-
+    except Exception as exc:
+        print(exc)
+        return {"error": str(exc)}

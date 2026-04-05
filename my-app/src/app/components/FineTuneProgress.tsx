@@ -1,14 +1,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type ProgressMsg = {
-  percent?: number;
-  phase?: number;
-  epoch?: number;
-  loss?: number | string;
+type FineTuneProgressProps = {
+  jobId: string;
+  onComplete?: (payload: { modelId?: string; modelName?: string; modelDir?: string }) => void;
 };
 
-export default function FineTuneProgress({ jobId }: { jobId: string }) {
+export default function FineTuneProgress({ jobId, onComplete }: FineTuneProgressProps) {
   const [percent, setPercent] = useState(0);
   const [phase, setPhase] = useState(1);
   const [epoch, setEpoch] = useState(1);
@@ -55,6 +53,11 @@ export default function FineTuneProgress({ jobId }: { jobId: string }) {
           setModelURL(msg.model_dir);
           const now = new Date().toLocaleTimeString();
           setLogs((prev) => [`[${now}] Training complete. Model: ${msg.model_dir}`, ...prev].slice(0, 200));
+          onComplete?.({
+            modelId: msg.model_id,
+            modelName: msg.model_name,
+            modelDir: msg.model_dir,
+          });
           es.close();
         }
 
@@ -76,7 +79,7 @@ export default function FineTuneProgress({ jobId }: { jobId: string }) {
       es.close();
       esRef.current = null;
     };
-  }, [jobId]);
+  }, [jobId, onComplete]);
 
   return (
     <div className="w-full max-w-2xl mx-auto p-4 bg-gray-900 text-white rounded-lg border border-gray-700">

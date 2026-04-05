@@ -1,3 +1,0 @@
-runtime: python
-entrypoint: handler
-base_image: runpod/worker-torch:2.1.0-py3.10-cuda12.1

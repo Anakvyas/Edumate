@@ -14,10 +14,10 @@ def vision_ocr():
             return jsonify({"status":"error"}),400
         
         url = run_vision(bucket,key)
+        if url.get("error"):
+            return jsonify({"message": url["error"]}), 500
 
-        # print(url)
-
-        return jsonify({"pdflink":url}),200
+        return jsonify({"pdflink": url}), 200
         
     except Exception as e:
         print(e)
@@ -25,4 +25,3 @@ def vision_ocr():
             "status": "error",
             "message": str(e)
         }), 500
-

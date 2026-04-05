@@ -1,47 +1,63 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
-from langchain_core.runnables import RunnableParallel, RunnablePassthrough
-from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
-import os
 from chromadb.config import Settings
-from prompts import summary_prompt, event_prompt, topic_prompt,project_prompt,suggestion_prompt,quizquestion_prompt
+from prompts import summary_prompt, event_prompt, topic_prompt, project_prompt, quizquestion_prompt
 from langchain_community.document_loaders import  PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from sentence_transformers import SentenceTransformer
+import contextlib
 import gc
 import chromadb
+import io
+import os
+import threading
 from langchain_chroma import Chroma
-from sklearn.cluster import KMeans
+from openrouter_client import prompt_completion
+from sentence_transformers import SentenceTransformer
 
 
 load_dotenv()
-key = os.getenv("GEMINI_API_KEY")
+os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+_embedding_lock = threading.Lock()
+_embedding_model = None
+_retriever_cache = {}
 
 
-llm = ChatGoogleGenerativeAI(
-    model="models/gemini-2.0-flash",
-    temperature=0.7,
-    google_api_key=key,
-)
+class QuietEmbeddings:
+    def __init__(self, model):
+        self.model = model
+
+    def embed_documents(self, texts):
+        return self.model.encode(texts, convert_to_numpy=True, show_progress_bar=False).tolist()
+
+    def embed_query(self, text):
+        return self.model.encode(text, convert_to_numpy=True, show_progress_bar=False).tolist()
 
 
-summary_chain = summary_prompt | llm
-event_chain = event_prompt | llm
-generate_project = project_prompt | llm
-generate_sugg = suggestion_prompt | llm
-generate_ques = quizquestion_prompt | llm
+def get_embedding_model():
+    global _embedding_model
+
+    if _embedding_model is not None:
+        return _embedding_model
+
+    with _embedding_lock:
+        if _embedding_model is None:
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
+                sentence_model = SentenceTransformer(EMBEDDING_MODEL_NAME, device="cpu")
+            _embedding_model = QuietEmbeddings(sentence_model)
+
+    return _embedding_model
 
 def generate_summary(transcript):
-    result = summary_chain.invoke({"transcript": transcript})
-    summary = result["text"] 
-    return summary
+    prompt = summary_prompt.format(transcript=transcript)
+    return prompt_completion(prompt, temperature=0.4)
 
 
 def extract_events(transcript):
-    result = event_chain.invoke({"transcript": transcript})
-    events = result["text"]
+    prompt = event_prompt.format(transcript=transcript)
+    events = prompt_completion(prompt, temperature=0.2)
     return events if events else "[]"
 
 
@@ -58,10 +74,7 @@ def process_pdf_rag(path, persist_dir):
     )
     chunks = text_splitter.split_documents(docs)
 
-    embedding = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
-        model_kwargs={"device": "cpu"}
-    )
+    embedding = get_embedding_model()
 
     client = chromadb.PersistentClient(
         path=persist_dir,
@@ -85,10 +98,11 @@ def process_pdf_rag(path, persist_dir):
 
 
 def load_vector_store(persist_dir):
-    embedding = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
-         model_kwargs={"device": "cpu"}
-    )
+    cached_retriever = _retriever_cache.get(persist_dir)
+    if cached_retriever is not None:
+        return cached_retriever
+
+    embedding = get_embedding_model()
 
     client = chromadb.PersistentClient(
         path=persist_dir,
@@ -101,8 +115,10 @@ def load_vector_store(persist_dir):
         embedding_function=embedding,
         persist_directory=persist_dir
     )
-    
-    return vector_store.as_retriever()
+
+    retriever = vector_store.as_retriever()
+    _retriever_cache[persist_dir] = retriever
+    return retriever
 
 def load_all_chunks(persist_dir):
     client = chromadb.PersistentClient(
@@ -131,7 +147,7 @@ def load_all_chunks(persist_dir):
 
 
 def build_qa_chain(retriever):
-    prompt = PromptTemplate(
+    template = PromptTemplate(
         input_variables=["context", "question"],
         template="""
 You are a knowledgeable assistant. Use ONLY the context below to answer.
@@ -145,36 +161,40 @@ Question:
 Answer clearly in 2–4 sentences without adding external knowledge.
 """,
     )
+    
+    class RetrievalQAChain:
+        def __init__(self, active_retriever, prompt_template):
+            self.retriever = active_retriever
+            self.prompt_template = prompt_template
 
-    qa_chain = (
-        {"context": retriever, "question": RunnablePassthrough()}
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
+        def invoke(self, question):
+            docs = self.retriever.invoke(question)
+            context = "\n\n".join([doc.page_content for doc in docs])
+            prompt = self.prompt_template.format(context=context, question=question)
+            return prompt_completion(prompt, temperature=0.2)
 
-    return qa_chain
+    return RetrievalQAChain(retriever, template)
 
 
 
 def get_topics(retriever):
-    qa_chain = (
-        {"context": retriever, "question": RunnablePassthrough()}
-        | topic_prompt
-        | llm
-        | StrOutputParser()
-    )
-    return qa_chain
+    class TopicChain:
+        def __init__(self, active_retriever):
+            self.retriever = active_retriever
+
+        def invoke(self, question):
+            docs = self.retriever.invoke(question)
+            context = "\n\n".join([doc.page_content for doc in docs])
+            prompt = topic_prompt.format(context=context)
+            return prompt_completion(prompt, temperature=0.4)
+
+    return TopicChain(retriever)
 
 
 def generate_streamlit_project(topic):
-    result = generate_project.invoke({"topic":topic})
-    # print(result)
-    res = result["text"]
-    return res
+    prompt = project_prompt.format(topic=topic)
+    return prompt_completion(prompt, temperature=0.4, timeout=180)
 
 def  generate_question(prompt,content):
-    result = generate_ques.invoke({"prompt":prompt,"content":content})
-    # print(result)
-    res = result.content
-    return res
+    final_prompt = quizquestion_prompt.format(prompt=prompt, content=content)
+    return prompt_completion(final_prompt, temperature=0.4, timeout=180)

@@ -3,6 +3,33 @@ import Groq from "groq-sdk";
 
 const client = new Groq({ apiKey: process.env.Next_GROP_API_KEY! });
 
+function normalizeProject(payload: any, fallbackDescription: string) {
+  const frontend = payload?.frontend ?? {};
+  const backend = payload?.backend ?? {};
+
+  return {
+    project_name:
+      typeof payload?.project_name === "string" && payload.project_name.trim()
+        ? payload.project_name
+        : "generated-project",
+    description:
+      typeof payload?.description === "string" && payload.description.trim()
+        ? payload.description
+        : fallbackDescription,
+    frontend: {
+      "index.html": typeof frontend?.["index.html"] === "string" ? frontend["index.html"] : "",
+      "style.css": typeof frontend?.["style.css"] === "string" ? frontend["style.css"] : "",
+      "script.js": typeof frontend?.["script.js"] === "string" ? frontend["script.js"] : "",
+    },
+    backend: {
+      "app.py": typeof backend?.["app.py"] === "string" ? backend["app.py"] : "",
+      "model.py": typeof backend?.["model.py"] === "string" ? backend["model.py"] : "",
+      "requirements.txt": typeof backend?.["requirements.txt"] === "string" ? backend["requirements.txt"] : "",
+      "readme.md": typeof backend?.["readme.md"] === "string" ? backend["readme.md"] : "",
+    },
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { description } = await req.json();
@@ -79,17 +106,89 @@ RETURN THIS JSON STRUCTURE:
 
     const content = chat.choices?.[0]?.message?.content ?? "{}";
     const json = JSON.parse(content);
-    if (
-      !json.project_name ||
-      !json.frontend ||
-      !json.frontend["index.html"] ||
-      !json.frontend["style.css"]
-    ) {
-      return NextResponse.json({ error: "Invalid response. Try again." });
-    }
-    // saveProject(json.project_name, { ...json.frontend, ...json.backend });
+    const normalized = normalizeProject(json, description);
 
-    return NextResponse.json(json);
+    if (!normalized.frontend["index.html"]) {
+      normalized.frontend["index.html"] = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${normalized.project_name}</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="card">
+      <p class="eyebrow">Generated Project</p>
+      <h1>${normalized.project_name}</h1>
+      <p>${normalized.description}</p>
+      <button id="action-button">Get Started</button>
+    </section>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>`;
+    }
+
+    if (!normalized.frontend["style.css"]) {
+      normalized.frontend["style.css"] = `:root {
+  --bg: #0b1020;
+  --panel: #121a30;
+  --accent: #64ffb0;
+  --text: #f5f7ff;
+  --muted: #b7bfdc;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  font-family: Arial, sans-serif;
+  background: radial-gradient(circle at top, #17213f, var(--bg));
+  color: var(--text);
+}
+
+.shell { padding: 24px; width: min(100%, 960px); }
+.card {
+  padding: 32px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  border: 1px solid rgba(100,255,176,0.2);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.35);
+}
+.eyebrow {
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 12px;
+}
+h1 { margin: 12px 0; font-size: clamp(2rem, 4vw, 3.5rem); }
+p { color: var(--muted); line-height: 1.6; }
+button {
+  margin-top: 16px;
+  border: 0;
+  border-radius: 999px;
+  padding: 14px 22px;
+  background: linear-gradient(135deg, #64ffb0, #36cfff);
+  color: #04111d;
+  font-weight: 700;
+  cursor: pointer;
+}`;
+    }
+
+    if (!normalized.frontend["script.js"]) {
+      normalized.frontend["script.js"] = `const button = document.getElementById("action-button");
+if (button) {
+  button.addEventListener("click", () => {
+    button.textContent = "Ready";
+  });
+}`;
+    }
+
+    return NextResponse.json(normalized);
 
 
   } catch (err: any) {

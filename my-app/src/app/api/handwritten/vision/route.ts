@@ -5,6 +5,22 @@ import axios from "axios";
 import { connectDB } from "../../utils/db";
 import Document from "../../lib/Document";
 
+function extractPdfPayload(payload: any) {
+    const rawPayload = payload?.pdflink ?? payload;
+    const normalized = Array.isArray(rawPayload) ? rawPayload[0] : rawPayload;
+
+    if (normalized?.pdf_url && normalized?.vectorstore) {
+        return normalized as {
+            pdf_url: string;
+            vectorstore: string;
+            ocr_pages?: { page: number; text: string }[];
+            raw_text?: string;
+        };
+    }
+
+    return null;
+}
+
 export async function POST(req:NextRequest){
     try{
         const formdata = await req.formData();
@@ -13,7 +29,7 @@ export async function POST(req:NextRequest){
 
         // console.log(file,userID)
         if(!file){
-            return NextResponse.json({"message":"No file there!"},{status:400})
+            return NextResponse.json({"message":"No handwritten PDF file was uploaded."},{status:400})
         }
 
         const bytes = await file.arrayBuffer();
@@ -31,10 +47,13 @@ export async function POST(req:NextRequest){
 
         const res = await axios.post(process.env.NEXT_PUBLIC_BACKEND_URL+"/vision_ocr",{key,bucket,userID});
 
-        // console.log(res.data)
-        const url = res.data.pdflink[0];
-        const pdflink = url.pdf_url;
-        const persist_dir = url.vectorstore;
+        const response = extractPdfPayload(res.data);
+        if (!response) {
+            throw new Error("Backend did not return a valid handwritten OCR payload.");
+        }
+        const pdflink = response.pdf_url;
+        const persist_dir = response.vectorstore;
+        const ocrPages = response.ocr_pages || [];
 
         await connectDB();
 
@@ -45,10 +64,10 @@ export async function POST(req:NextRequest){
             persist_dir :persist_dir
         })
 
-        return NextResponse.json({"pdflink":pdflink},{status:200})
+        return NextResponse.json({"pdflink":pdflink,"ocrPages":ocrPages},{status:200})
 
     }catch(err:any){
         console.log(err)
-        return NextResponse.json({"message":err.message},{status:500})
+        return NextResponse.json({"message":err?.response?.data?.message || err.message || "Handwritten OCR failed."},{status:500})
     }
 }

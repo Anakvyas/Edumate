@@ -5,13 +5,24 @@ import Document from "../lib/Document";
 import { NextResponse } from "next/server";
 import { connectDB } from "../utils/db";
 
+function extractPdfPayload(payload: any) {
+    const rawPayload = payload?.pdflink ?? payload;
+    const normalized = Array.isArray(rawPayload) ? rawPayload[0] : rawPayload;
+
+    if (normalized?.pdf_url && normalized?.vectorstore) {
+        return normalized as { pdf_url: string; vectorstore: string };
+    }
+
+    return null;
+}
+
 export async function POST(req: Request) {
     try{
         const formdata  = await req.formData();
         const userID = formdata.get("userID") || "demo"
         const file = formdata.get('pdf') as File;
         if(!file){
-            return new Response(JSON.stringify({message:"No file there!"}),{status:400})
+            return new Response(JSON.stringify({message:"No PDF file was uploaded."}),{status:400})
         }
         await connectDB();
         
@@ -27,9 +38,11 @@ export async function POST(req: Request) {
             ContentType:"application/pdf"
         }))
 
-
         const res = await axios.post(process.env.NEXT_PUBLIC_BACKEND_URL+"/upload_pdf",{key,bucket,userID});
-        const response = res.data.pdflink[0];
+        const response = extractPdfPayload(res.data);
+        if (!response) {
+            throw new Error("Backend did not return a valid PDF notes payload.");
+        }
         const pdf_url = response.pdf_url;
         const persist_dir = response.vectorstore;
 
@@ -43,6 +56,6 @@ export async function POST(req: Request) {
 
     }catch(err:any){
         console.log(err)
-        return NextResponse.json({"message":err.message},{status:500})
+        return NextResponse.json({"message":err?.response?.data?.message || err.message || "PDF upload failed."},{status:500})
     }
 }

@@ -9,9 +9,8 @@ export async function POST(req:NextRequest){
         const formData = await req.formData();
         const image = formData.get('image') as File;
         const label = formData.get('label');
-        const userID =  formData.get("UserID") || "demo";
+        const userID =  formData.get("userID") || "demo";
         const productId = formData.get("productId")
-        console.log(productId)
 
         if(!image){
             return NextResponse.json({"message":"No Image Provided !!"},{status:400})
@@ -58,6 +57,7 @@ export async function POST(req:NextRequest){
 export async function GET(req:NextRequest){
     try{
         const productId = req.nextUrl.searchParams.get('productID');
+        await connectDB();
         const arr = await Train.findOne({productId:productId});
 
 

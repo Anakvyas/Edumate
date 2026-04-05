@@ -8,6 +8,9 @@ const DocumentSchema =  new mongoose.Schema({
     handwrittenS3_pdfkey:{
         type:String,
     },
+    handwritingModelId:{
+        type:String,
+    },
     pdf_link:{
         type:String,
         required:true,

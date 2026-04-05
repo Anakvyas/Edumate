@@ -1,0 +1,70 @@
+# Secrets
+.env
+.env.*
+*.env
+*.pem
+*.key
+
+# Google service account keys
+fourth-amp-476617-j8-f7a43bf7a0c0.json
+python-app/shining-insight-476614-j1-41579d764a74.json
+*.json.backup
+
+# Node / Next.js
+node_modules/
+my-app/node_modules/
+my-app/.next/
+my-app/out/
+my-app/.turbo/
+my-app/.vercel/
+my-app/coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+site/
+*.egg-info/
+
+# Virtual environments
+venv/
+.venv/
+env/
+python-app/myvenv/
+python-app/venv/
+
+# Local app artifacts
+python-app/uploadfiles/
+python-app/vectorstores/
+python-app/trained_models/
+python-app/*.zip
+python-app/routes/__pycache__/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Misc generated files
+tmp/
+temp/

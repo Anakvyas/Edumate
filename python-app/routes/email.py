@@ -1,11 +1,16 @@
-from flask import Flask, request,jsonify,Blueprint
-import google.generativeai as genai 
-import os
-from dotenv import load_dotenv
-load_dotenv()
+from flask import request, jsonify, Blueprint
+from openrouter_client import prompt_completion
 
-genai.configure(api_key = os.getenv("GEMINI_API_KEY"))
 email = Blueprint('email',__name__)
+
+
+def get_email_body(data):
+    selected_email = data.get("SelectedEmail") or {}
+    if isinstance(selected_email, dict):
+        body = selected_email.get("body") or {}
+        if isinstance(body, dict):
+            return body.get("content", "")
+    return str(selected_email)
 
 summary_prompt = """
 Summarize the email in simple clear bullet points. Do not use any bold, italic, or special formatting. 
@@ -62,11 +67,10 @@ Email Content:
 def summarize_email():
     try:
         data = request.get_json()
-        email_content = data.get('SelectedEmail', '')
+        email_content = get_email_body(data)
         prompt = summary_prompt.format(email_body=email_content)
-        model = genai.GenerativeModel("models/gemini-2.0-flash")
-        response = model.generate_content(prompt)
-        return jsonify({"summary": response.text.strip()}), 200
+        summary = prompt_completion(prompt, temperature=0.3)
+        return jsonify({"summary": summary}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
@@ -76,12 +80,11 @@ def summarize_email():
 def draft_mail():
     try:
         data = request.get_json()
-        email_body = data.get('SelectedEmail', {}).get("body", {}).get("content", "")
+        email_body = get_email_body(data)
 
-        model = genai.GenerativeModel("models/gemini-2.0-flash")
-        response = model.generate_content(draft_prompt.format(email_body=email_body))
+        draftmail = prompt_completion(draft_prompt.format(email_body=email_body), temperature=0.5)
 
-        return jsonify({"draftmail": response.text.strip()}), 200
+        return jsonify({"draftmail": draftmail}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -89,10 +92,9 @@ def draft_mail():
 def extract_events():
     try:
         data = request.get_json()
-        email_content = data.get('SelectedEmail', '')     
-        model = genai.GenerativeModel("models/gemini-2.0-flash")
+        email_content = get_email_body(data)
         prompt = events_prompt.format(email_body=email_content)
-        response = model.generate_content(prompt)
-        return jsonify({"events": response.text.strip()}), 200
+        events = prompt_completion(prompt, temperature=0.2)
+        return jsonify({"events": events}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500

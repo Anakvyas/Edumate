@@ -3,6 +3,26 @@ import { NextRequest, NextResponse } from "next/server";
 import Document from "../lib/Document";
 import { connectDB } from "../utils/db";
 
+function normalizeVideoPayload(payload: any) {
+  if (!payload) {
+    return null;
+  }
+
+  if (payload.pdf_url && payload.vectorstore) {
+    return payload;
+  }
+
+  if (Array.isArray(payload.pdf_link) && payload.pdf_link[0]?.pdf_url) {
+    return payload.pdf_link[0];
+  }
+
+  if (payload.pdf_link?.pdf_url && payload.pdf_link?.vectorstore) {
+    return payload.pdf_link;
+  }
+
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const data = await req.formData();
@@ -37,23 +57,24 @@ export async function POST(req: NextRequest) {
 
     // 🕒 Poll the result until it's ready
     let result = null;
-    for (let i = 0; i < 30; i++) { // 30 tries * 5s = 150s max
+    for (let i = 0; i < 60; i++) {
       const poll = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/get_result/${job_id}`);
-      if (poll.status === 200 && poll.data.pdf_link) {
-        result = poll.data;
+      if (poll.status === 200 && poll.data.error) {
+        return NextResponse.json({ message: poll.data.error }, { status: 500 });
+      }
+      const normalized = normalizeVideoPayload(poll.data);
+      if (poll.status === 200 && normalized) {
+        result = normalized;
         break;
       }
-      await new Promise(r => setTimeout(r, 5000)); // wait 5s
+      await new Promise(r => setTimeout(r, 5000));
     }
 
     if (!result) {
       return NextResponse.json({ message: "Transcription not ready" }, { status: 504 });
     }
 
-    console.log(result)
-    console.log("");
-    const { pdf_url, vectorstore } = result.pdf_link[0];
-    console.log(pdf_url,vectorstore)
+    const { pdf_url, vectorstore } = result;
 
     await Document.create({
       userID,

@@ -8,10 +8,9 @@ from fpdf import FPDF
 import boto3
 import os
 from dotenv import load_dotenv
-from io import BytesIO
 import textwrap
-import google.generativeai as genai 
 import shutil
+from openrouter_client import prompt_completion
 from utils import process_pdf_rag
 
 load_dotenv()
@@ -23,7 +22,6 @@ s3 = boto3.client(
     aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
     region_name="eu-north-1"
 )
-genai.configure(api_key = os.getenv("GEMINI_API_KEY"))
 
 
 def clean_content(pdf_result):
@@ -48,8 +46,6 @@ def clean_and_parse_json(text: str):
             return ast.literal_eval(text)
         except Exception:
             return [text]
-
-import re
 
 def remove_non_latin(text):
     return re.sub(r'[^\x00-\xff]', '?', text)
@@ -152,9 +148,7 @@ Generate well-structured study notes from the given text.
 Return **only the improved notes**, no explanation or extra comments .
 """
     
-    model = genai.GenerativeModel("models/gemini-2.0-flash")
-    response = model.generate_content(prompt)
-    return response.text.strip()
+    return prompt_completion(prompt, temperature=0.7)
 
 
 
@@ -183,11 +177,11 @@ def get_links(text):
         os.remove(tmp_pdf_path)
 
         return {
-            "pdf_url": pdf_url,             
-            "vectorstore": persist_dir    
-        }, 200
-    
+            "pdf_url": pdf_url,
+            "vectorstore": persist_dir,
+        }
+
     except Exception as e:
         print(e)
-        return {"error":e}
+        return {"error": str(e)}
     
