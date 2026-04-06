@@ -3,8 +3,7 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import Quiz from '../Quiz'
 import { use } from "react";
-
-
+// jrnfnj
 export default function QuizPage( {params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);  
   const [quiz, setQuiz] = useState<any>(null);
