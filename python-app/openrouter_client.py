@@ -5,7 +5,7 @@ from env_config import ENV_PATH
 from redis_cache import build_cache_key, get_json, set_json
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "stepfun/step-3.5-flash:free")
+DEFAULT_MODEL = "nvidia/nemotron-nano-9b-v2:free"
 HTTP_SESSION = requests.Session()
 
 

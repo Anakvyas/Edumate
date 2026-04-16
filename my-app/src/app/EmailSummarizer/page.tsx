@@ -77,17 +77,17 @@ const Page = () => {
     }
 
     const handlesummary = async () => {
-        const res = await axios.post(process.env.NEXT_PUBLIC_BACKEND_URL + '/summarize_email', { SelectedEmail })
+        const res = await axios.post('/api/email/summarize', { SelectedEmail })
         setsummary(res.data.summary);
     }
 
     const handledreaftmail = async () => {
-        const res = await axios.post(process.env.NEXT_PUBLIC_BACKEND_URL + '/draftmail', { SelectedEmail })
+        const res = await axios.post('/api/email/draft', { SelectedEmail })
         setdraftmail(res.data.draftmail);
     }
 
     const handleEmail = async () => {
-        const res = await axios.post(process.env.NEXT_PUBLIC_BACKEND_URL + '/getevents', { SelectedEmail })
+        const res = await axios.post('/api/email/events', { SelectedEmail })
         setevents(res.data.events);
     }
 
